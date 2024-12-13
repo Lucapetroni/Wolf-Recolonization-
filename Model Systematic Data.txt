@@ -1,0 +1,118 @@
+model {
+
+#Ecological submodel
+ for (i in 1:nsites){ 
+  for (t in 1:nyears){
+    z[i,t] ~ dbern(psi[i,t])
+    logit(psi[i,t]) <- a.psi + b1 * latitude[i] + b2 * longitude[i] + b3 * latitude[i] * longitude[i] + rdm.site[i] + rdm.year[t] 
+  }
+ }
+
+#Priors
+
+   #Occupancy prob. intercept
+     a.psi ~ dlogis(0,1)
+
+   #Beta coefficients
+    b1 ~ dlogis(0,1)
+    b2 ~ dlogis(0,1)
+    b3 ~ dlogis(0,1)
+ 
+   #Gaussian Random Site effect
+
+   for (i in 1:nsites){
+    rdm.site[i] ~ dnorm(0,1/sigma1*sigma1)
+   }
+
+   sigma1 ~ dunif(0,5)
+
+   #Random walk for year
+
+   rdm.year[1] <- 0
+   for (t in 1:(nyears-1)){
+    rdm.year[t+1] <- rdm.year[t] + diff.rdm.year[t]
+    diff.rdm.year[t] ~ dnorm(0,1/sigma2*sigma2)
+   }
+   
+   sigma2 ~ dunif(0,5)
+
+#### #### #### #### #### #### #### #### #### #### #### ####
+
+#Detection submodel
+ for (i in 1:nsites){
+  for (j in 1:nsurveys){ 
+   for (t in 1:nyears){
+    y[i,j,t] ~ dbern(z[i,t] * p[i,j,t])
+   }
+  }
+ }
+
+ for (i in 1:nsites){
+  for (j in 1:nsurveys){ 
+  for (t in 1:nyears){    
+   logit(p[i,j,t]) <- a.detp + b4 * effort[i,j,t]
+  }
+ }
+} 
+
+#Priors
+
+   #Detection prob. intercept
+    a.detp ~ dlogis(0,1)
+
+   #Beta coefficients
+    b4 ~ dlogis(0,1)
+
+##############################################################################################
+
+#Derived quantities
+for (t in 1:nyears){
+avg.psi[t] <- mean(psi[,t])
+avg.p[t] <- mean(p[,,t])
+}
+
+#####################################################################################################
+
+#GOF testing with Chi-squared and Freeman-Tukey discrepancy measures (based on Kery and Royle 2021: Applied Hierarchical Modeling in Ecology: Analysis of Distribution, Abundance and Species Richness in R and BUGS. Academic Press
+
+# Draw a replicate data set under the fitted model
+for (i in 1:nsites){
+  for (t in 1:nyears){
+    for (j in 1:nsurveys){
+      yrep[i,j,t] ~ dbern(z[i,t] * p[i,j,t])
+    }
+  }
+}
+
+# Compute detection frequencies for observed and replicated data
+for (i in 1:nsites){
+  for (t in 1:nyears){
+    # Det. frequencies for observed and replicated data
+    detfreq[i,t] <- sum(y[i,,t])
+    detfreqrep[i,t] <- sum(yrep[i,,t])
+    # Expected detection frequencies under the model
+    for (j in 1:nsurveys){
+      tmp[i,j,t] <- z[i,t] * p[i,j,t]
+    }
+    E[i,t] <- sum(tmp[i,,t])     # Expected number of detections
+    # Chi-square and Freeman-Tukey discrepancy measures
+    # ..... for actual data set
+    x2[i,t] <- pow((detfreq[i,t] - E[i,t]),2) / (E[i,t]+0.00000001)
+    ft[i,t] <- pow((sqrt(detfreq[i,t]) - sqrt(E[i,t])),2)
+    # ..... for replicated data set
+    x2rep[i,t] <- pow((detfreqrep[i,t] - E[i,t]),2) / (E[i,t]+0.00000001)
+    ftrep[i,t] <- pow((sqrt(detfreqrep[i,t]) - sqrt(E[i,t])),2)
+  }
+}
+# Add up Chi-square and FT discrepancies and compute fit stat ratio (closed part)
+Chi2 <- sum(x2[,])
+FT <- sum(ft[,])
+Chi2rep <- sum(x2rep[,])
+FTrep <- sum(ftrep[,])
+Chi2.chat <- Chi2 / Chi2rep
+FT.chat <- FT / FTrep
+Chi2.bpv <- step(Chi2rep-Chi2)
+FT.bpv <- step(FTrep-FT)
+
+
+}
