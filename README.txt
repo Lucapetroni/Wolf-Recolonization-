@@ -16,3 +16,5 @@ This Comma Separated file contains information on pup responses to wolf howling 
 # Code-Recolonization pattern of Wolves in Northern Apennines.R
 This file contains all the R scripts necessary to perform the modelling described in the paper and to build the figures presented in the results section
 
+# Model Opportunistic Data.txt and Model Systematic Data.txt
+Text files defining the JAGS models fitted to the wolf opportunistic and systematic datasets, respectively
